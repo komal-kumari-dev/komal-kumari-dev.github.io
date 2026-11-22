@@ -1023,6 +1023,12 @@
       if (F.honey.value) return;           // bot detected
       if (!validate()) return;
 
+      // File ko double-click karke kholne pe (file://) form services kaam nahi karti
+      if (location.protocol === "file:") {
+        showStatus("bad", "⚠️ Form sirf LIVE website (https://...github.io) pe kaam karega. File ko double-click karke kholne pe message nahi jaata. Pehle site GitHub pe live karo, phir test karo.");
+        return;
+      }
+
       const data = {
         name: F.name.value.trim(),
         email: F.email.value.trim(),
@@ -1058,14 +1064,22 @@
               _captcha: "false"
             })
           });
-          json = await res.json();
-          if (!(json.success === true || json.success === "true")) throw new Error(json.message || "Failed");
+          json = await res.json().catch(() => ({}));
+          if (!(json.success === true || json.success === "true")) {
+            const msg = String(json.message || "");
+            // Pehli baar: FormSubmit Gmail pe activation link bhejta hai
+            if (/activat/i.test(msg)) {
+              showStatus("ok", "📩 Form activation pending: " + CONTACT_EMAIL + " ke Gmail me (Spam bhi check karo) FormSubmit ka 'Activate Form' mail aaya hoga. Us pe click karke dobara message bhejo.");
+              return;
+            }
+            throw new Error(msg || ("HTTP " + res.status));
+          }
         }
         showStatus("ok", "✅ Thank you, " + data.name + "! Your message has been sent. I'll reply soon.");
         form.reset();
       } catch (err) {
         console.error("Contact form error:", err);
-        showStatus("bad", "❌ Sorry, the message could not be sent. Please email me directly at " + CONTACT_EMAIL + ".");
+        showStatus("bad", "❌ Sorry, the message could not be sent (" + (err && err.message ? err.message : "network error") + "). Please email me directly at " + CONTACT_EMAIL + ".");
       } finally {
         btn.disabled = false; btn.classList.remove("loading"); btnText.textContent = "Send Message";
       }
